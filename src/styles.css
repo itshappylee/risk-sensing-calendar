@@ -2330,6 +2330,70 @@ textarea.fld {
   padding: 3px 6px;
 }
 
+/* ── 날짜 없는 후보 (→ 2026-09-22) ────────────────────────────────
+   기사에 날짜가 없는 건은 승인해도 캘린더에 오르지 못한다.
+   행에 표시를 남기고, 승인 전에 기간을 받는다. */
+
+.rtbl-item {
+  border-bottom: 1px solid var(--border);
+}
+
+.rtbl-item .rtbl-row {
+  border-bottom: 0;
+}
+
+.rtbl-row.warn {
+  background: var(--sev-mid-bg, #fffbeb);
+}
+
+.no-date {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--sev-mid, #b45309);
+}
+
+.row-warn {
+  margin: 0;
+  padding: 0 12px 8px;
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--sev-mid, #b45309);
+}
+
+.date-ask {
+  padding: 4px 12px 12px;
+}
+
+.date-ask-hint {
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+.date-ask-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.date-ask-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+
+.date-ask-row .tiny-input {
+  flex: 0 0 auto;
+  width: 140px;
+  font-size: 12px;
+  padding: 5px 8px;
+}
+
 @media (max-width: 900px) {
   .rtbl-row {
     grid-template-columns: 1fr;
@@ -3097,25 +3161,101 @@ textarea.fld {
   opacity: 0.62;
 }
 
-.alt-card.pending {
+/* 통과국 — 사용자가 고르지 않고 국경표가 채운 나라. 옅게 둬서 입력과 구분한다 (2026-10-14) */
+.leg.transit {
+  border-style: dashed;
+}
+.leg.transit .leg-city {
+  font-weight: 500;
+  opacity: 0.7;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+
+/* 경로 비교 — 국경표가 찾은 경로들 (2026-10-14, 기존 "준비중" 자리) */
+.alt-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  border-style: dashed;
-  background: transparent;
+  gap: 6px;
+  margin-top: 10px;
 }
 
-.alt-card.pending:hover {
-  border-color: var(--border);
-  box-shadow: none;
-  transform: none;
+.alt-row {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto 56px 28px auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  text-align: left;
+  font: inherit;
+  color: var(--text-1);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  cursor: pointer;
 }
 
-.alt-pending-body {
-  margin: 0;
-  font-size: 12.5px;
-  line-height: 1.6;
+.alt-row:hover {
+  border-color: var(--border-strong, var(--text-3));
+}
+
+.alt-row.on {
+  border-color: var(--accent, #2563eb);
+  box-shadow: inset 0 0 0 1px var(--accent, #2563eb);
+}
+
+.alt-tag {
+  font-size: 11px;
+  font-weight: 700;
   color: var(--text-3);
+  white-space: nowrap;
+}
+
+.alt-path {
+  font-size: 12.5px;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alt-hops {
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+/* 위험 건수 High/Med/Low — 등급이 같아도 어디가 덜 걸리는지 보이게 (2026-10-14) */
+.alt-counts {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.chip.alt-best {
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .alt-row {
+    grid-template-columns: 54px minmax(0, 1fr) 28px;
+    row-gap: 4px;
+  }
+  .alt-hops,
+  .alt-counts {
+    grid-column: 2 / 4;
+    text-align: left;
+  }
+  .chip.alt-best {
+    grid-column: 1 / 4;
+    justify-self: start;
+  }
 }
 
 /* ==========================================================================
@@ -3247,6 +3387,167 @@ textarea.fld {
   font-size: 12px;
   color: var(--text-3);
 }
+
+/* 유형 설명의 '무엇을 넣고 빼는지' 줄 — 본문과 구분되게 한 단 내려 쓴다 */
+.rtn-note {
+  display: block;
+  margin-top: 6px;
+  padding-left: 9px;
+  border-left: 2px solid var(--border-strong);
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--text-3);
+}
+
+/* ── 경로 분석 탭 + 엑셀 일괄 조회 (2026-10-14) ───────────────────── */
+
+/* ⚠️ [hidden]은 브라우저 기본 display:none인데, .route-main의 display:flex가 그것을 이긴다.
+   이 한 줄이 없으면 엑셀 탭을 눌러도 아래에 단일 조회 화면이 그대로 남는다 (2026-10-15 확인).
+   조건부 렌더 대신 hidden을 쓰는 이유는 탭을 오가도 조회 결과를 잃지 않기 위해서다. */
+.route-main[hidden] {
+  display: none;
+}
+
+.route-tabs {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.route-tabs button {
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-3);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+
+.route-tabs button:hover {
+  color: var(--text-1);
+}
+
+.route-tabs button.on {
+  color: var(--text-1);
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.batch-panel {
+  padding: 18px;
+}
+
+.batch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.batch-file {
+  font-size: 12px;
+  color: var(--text-3);
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.batch-problems {
+  margin: 8px 0 16px;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+
+.batch-problems b {
+  color: var(--sev-mid, #b45309);
+}
+
+.batch-table {
+  display: flex;
+  flex-direction: column;
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.batch-head,
+.batch-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1.1fr) minmax(170px, 1.6fr) 168px 150px minmax(200px, 2.2fr);
+  gap: 10px;
+  align-items: center;
+  padding: 9px 12px;
+}
+
+.batch-head {
+  background: var(--surface-2, #f6f7f9);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+
+.batch-row {
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
+}
+
+.batch-row > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.batch-row em {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+
+.batch-row .b-name {
+  font-weight: 700;
+}
+
+.batch-row .b-when {
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+
+.batch-row .b-risk {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+@media (max-width: 940px) {
+  .batch-head {
+    display: none;
+  }
+  .batch-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 4px;
+  }
+  .batch-row .b-path,
+  .batch-row .b-when,
+  .batch-row .b-driver {
+    grid-column: 1 / 3;
+    white-space: normal;
+  }
+}
+
 
 /* ==========================================================================
    위험도 필터 — 유형 필터(.tf-chip)와 같은 모양. 색만 --sev-* 토큰을 쓴다
@@ -3514,3 +3815,104 @@ textarea.fld {
 .emap-zoom button:hover {
   border-color: var(--accent);
 }
+
+
+/* 조회 방식 선택 (한 건 / 여러 건) — 입력 폼 맨 위 */
+.route-kind {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  margin: 2px 0 14px;
+  background: var(--bg, #f3f4f8);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.route-kind button {
+  flex: 1;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted, #6b7280);
+  font-weight: 600;
+  cursor: pointer;
+}
+.route-kind button.on {
+  background: var(--surface);
+  color: var(--text, #111827);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.batch-input .batch-actions { margin-bottom: 8px; }
+.batch-input .batch-file { margin: 4px 0 8px; font-size: 12.5px; color: var(--text-muted, #6b7280); }
+
+.rr-export {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+/* ---- 여러 건 결과: 요약·정렬·상세 펼침 ---- */
+.multi-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin: 2px 0 10px;
+  font-size: 13px;
+}
+.multi-summary .ms-item { display: inline-flex; align-items: center; gap: 5px; }
+.multi-summary .ms-sort { margin-left: auto; font-size: 11.5px; color: var(--text-3); }
+
+.batch-row .b-path { white-space: normal; }
+.batch-row .b-counts { display: block; margin: 0 0 0 6px; font-weight: 600; white-space: normal; line-height: 1.25; }
+.batch-row .b-risk { align-items: center; flex-wrap: nowrap; }
+.batch-row.clickable { cursor: pointer; }
+.batch-row.clickable:hover, .batch-item.open > .batch-row { background: var(--surface-2, #f6f7f9); }
+.batch-row.clickable:focus-visible { outline: 2px solid var(--accent, #2563eb); outline-offset: -2px; }
+.batch-row .b-chev { display: inline-block; width: 14px; color: var(--text-3); }
+.batch-item { border-top: 1px solid var(--border); }
+.batch-item > .batch-row { border-top: 0; }
+
+.batch-detail {
+  padding: 10px 14px 14px 26px;
+  background: var(--surface-2, #f6f7f9);
+  border-top: 1px dashed var(--border);
+}
+.bd-title { margin: 8px 0 6px; font-size: 12.5px; font-weight: 700; }
+.bd-options, .bd-events { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
+.bd-options li, .bd-events li {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 7px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; font-size: 12.5px;
+}
+.bd-options li.safer { border-color: var(--sev-low-bd, #86efac); }
+.bd-options .bd-tag { min-width: 44px; font-weight: 700; color: var(--text-3); }
+.bd-options .bd-path { flex: 1; min-width: 160px; }
+.bd-options em { font-style: normal; font-size: 11.5px; color: var(--text-3); }
+.bd-safer { background: var(--sev-low-bg, #ecfdf3); color: var(--sev-low, #15803d); }
+.bd-events .bd-ev-main { flex: 1; min-width: 200px; }
+.bd-events a { font-size: 11.5px; }
+
+.route-note.coverage { color: var(--text-3); font-size: 11.5px; }
+
+.batch-row .b-name { white-space: normal; }
+.batch-row .b-counts { display: flex; flex-wrap: wrap; gap: 0 8px; }
+.batch-row .b-counts span { white-space: nowrap; }
+
+/* ---- 전 구간 위험: 범위 선택 ---- */
+.ap-scope { display: grid; gap: 6px; margin: 2px 0 12px; }
+.ap-scope label {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 13px;
+}
+.ap-scope label.on { border-color: var(--accent, #2563eb); background: var(--surface-2, #f6f7f9); }
+.ap-scope em { font-style: normal; font-size: 11.5px; color: var(--text-3); }
+.route-kind button { font-size: 12.5px; padding: 7px 6px; }
+
+.ap-hubs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 2px 0 12px; }
+.ap-hubs button {
+  padding: 9px 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+  font-weight: 600; font-size: 13px; cursor: pointer;
+}
+.ap-hubs button.on { border-color: var(--accent, #2563eb); background: var(--surface-2, #f6f7f9); color: var(--accent, #2563eb); }

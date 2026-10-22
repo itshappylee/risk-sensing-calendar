@@ -23,7 +23,7 @@ import { isActiveRisk } from './changes'
 const CSV_LANG = 'en' as const
 
 /** 엑셀에서 열 때 붙는 문제 세 가지를 여기서 전부 막는다 */
-function cell(v: string | number | null | undefined): string {
+export function cell(v: string | number | null | undefined): string {
   const s = v === null || v === undefined ? '' : String(v)
 
   // ① CSV 인젝션 — 데이터가 외부 크롤링에서 오므로 =·+·-·@로 시작하면 엑셀이 수식으로 실행한다

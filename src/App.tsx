@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Lang } from './lib/types'
 import { Header, type Screen } from './components/Header'
 import { CalendarScreen } from './components/CalendarScreen'
+import { RouteScreen } from './components/RouteScreen'
 import { InfoScreen } from './components/InfoScreen'
 import { AdminScreenContainer } from './components/AdminScreenContainer'
 import { LoginPanel } from './components/LoginPanel'
@@ -23,9 +24,12 @@ import type { Session } from '@supabase/supabase-js'
  */
 export default function App() {
   const url0 = useMemo(() => readUrl(), [])
+
   /** 화면 언어는 영어로 고정한다 (2026-10-22 사용자 지시). 상태로 두지 않는다 */
   const lang: Lang = 'en'
   const [screen, setScreen] = useState<Screen>(url0.screen ?? 'calendar')
+  /** 링크로 들어온 경로 분석 입력. 바뀌면 경로 분석 화면을 새로 열어 그 입력으로 조회한다 */
+  const [routeQ, setRouteQ] = useState(url0.route)
   const [toast, setToast] = useState<string | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loginOpen, setLoginOpen] = useState(false)
@@ -40,12 +44,18 @@ export default function App() {
   // ⚠️ 화면 전환만 반응한다 — 날짜·국가(d·c·v)는 CalendarScreen이 최초 1회만 읽는다 [미해결]
   useEffect(() => {
     const onHash = () => {
-      const next = readUrl().screen
-      if (next) setScreen(next)
+      const u = readUrl()
+      if (u.route) setRouteQ(u.route)
+      if (u.screen) setScreen(u.screen)
     }
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
+
+  // 다른 화면으로 가면 링크로 받은 입력은 비운다 — 나중에 메뉴로 다시 들어왔을 때 옛 조회가 되살아나지 않게
+  useEffect(() => {
+    if (screen !== 'route') setRouteQ(undefined)
+  }, [screen])
 
   // 로그아웃했는데 관리자 화면에 남아 있으면 아무것도 못 하는 빈 화면이 된다
   useEffect(() => {
@@ -84,6 +94,9 @@ export default function App() {
           initial={{ date: url0.date, country: url0.country, view: url0.view }}
           reporter={user?.email ?? null}
         />
+      )}
+      {screen === 'route' && (
+        <RouteScreen key={routeQ ? JSON.stringify(routeQ) : 'route'} lang={lang} onToast={showToast} initial={routeQ} />
       )}
       {screen === 'info' && <InfoScreen lang={lang} />}
       {screen === 'admin' && (

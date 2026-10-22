@@ -8,11 +8,16 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "check:calendar": "npx esbuild scripts/check-calendar.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/check.mjs --log-level=warning && node node_modules/.cache/check.mjs"
+    "check:calendar": "npx esbuild scripts/check-calendar.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/check.mjs --log-level=warning && node node_modules/.cache/check.mjs",
+    "check:batch": "npx esbuild scripts/check-batch.ts --bundle --platform=node --format=esm --external:exceljs '--define:import.meta.env={}' --outfile=node_modules/.cache/check-batch.mjs --log-level=warning && node node_modules/.cache/check-batch.mjs",
+    "check:routecsv": "npx esbuild scripts/check-routecsv.ts --bundle --platform=node --format=esm '--define:import.meta.env={}' --outfile=node_modules/.cache/check-routecsv.mjs --log-level=warning && node node_modules/.cache/check-routecsv.mjs",
+    "check:allpairs": "npx esbuild scripts/check-allpairs.ts --bundle --platform=node --format=esm '--define:import.meta.env={}' --outfile=node_modules/.cache/check-allpairs.mjs --log-level=warning && node node_modules/.cache/check-allpairs.mjs",
+    "check:graph": "npx esbuild scripts/check-graph.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/check-graph.mjs --log-level=warning && node node_modules/.cache/check-graph.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.2",
     "d3-geo": "^3.1.1",
+    "exceljs": "^4.4.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "topojson-client": "^3.1.0",
