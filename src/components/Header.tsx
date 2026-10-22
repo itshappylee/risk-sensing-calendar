@@ -5,7 +5,6 @@ export type Screen = 'calendar' | 'info' | 'admin'
 
 interface Props {
   lang: Lang
-  onLang: (l: Lang) => void
   screen: Screen
   onScreen: (s: Screen) => void
   /** 로그인한 사람의 이메일. null이면 비로그인 (읽기는 그대로 된다) */
@@ -31,7 +30,7 @@ interface Props {
  * URL(`#/admin`)로 들어가는 길은 그대로 열려 있다. 진짜 경계는 버튼이 아니라
  * RLS다 — 로그인하지 않으면 후보 목록이 빈 배열로 오고 승인도 안 된다 (→ DEC-025).
  */
-export function Header({ lang, onLang, screen, onScreen, userEmail, onSignIn, onSignOut }: Props) {
+export function Header({ lang, screen, onScreen, userEmail, onSignIn, onSignOut }: Props) {
   const t = makeT(lang)
 
   return (
@@ -79,14 +78,7 @@ export function Header({ lang, onLang, screen, onScreen, userEmail, onSignIn, on
           </button>
         )}
 
-        <div className="lang-toggle" role="group" aria-label="Language">
-          <button aria-pressed={lang === 'ko'} onClick={() => onLang('ko')}>
-            KR
-          </button>
-          <button aria-pressed={lang === 'en'} onClick={() => onLang('en')}>
-            EN
-          </button>
-        </div>
+        {/* KR/EN 전환은 2026-10-22에 없앴다 — 화면은 영어 하나다 (사용자 지시) */}
       </div>
     </header>
   )

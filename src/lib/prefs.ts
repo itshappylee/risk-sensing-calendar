@@ -12,11 +12,12 @@ const KEY = 'sels.prefs.v1'
 export interface Prefs {
   /** 담당 국가. 비어 있으면 전체 */
   country: string | null
+  /** 화면 언어. 2026-10-22부터 항상 'en'이다 (사용자 지시). 타입과 저장값은 남겨 둔다 */
   lang: Lang
   view: 'month' | 'map' | 'list'
 }
 
-const DEFAULTS: Prefs = { country: null, lang: 'ko', view: 'month' }
+const DEFAULTS: Prefs = { country: null, lang: 'en', view: 'month' }
 
 export function loadPrefs(): Prefs {
   try {
@@ -25,7 +26,7 @@ export function loadPrefs(): Prefs {
     const parsed = JSON.parse(raw) as Partial<Prefs>
     return {
       country: typeof parsed.country === 'string' ? parsed.country : null,
-      lang: parsed.lang === 'en' ? 'en' : 'ko',
+      lang: 'en', // 저장된 값이 'ko'여도 무시한다 (화면 언어는 영어 고정, 2026-10-22)
       view: parsed.view === 'list' || parsed.view === 'map' ? parsed.view : 'month',
     }
   } catch {
