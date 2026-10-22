@@ -429,6 +429,12 @@ button {
   margin-left: auto;
 }
 
+/* 툴바 줄바꿈 — flex 한 줄을 강제로 끊는다 */
+.toolbar-break {
+  flex-basis: 100%;
+  height: 0;
+}
+
 /* ==========================================================================
    레이아웃
    ========================================================================== */
@@ -2635,14 +2641,6 @@ textarea.fld {
   padding: 14px;
 }
 
-/* 좌 설명 / 우 지도. 지도가 주인공이라 폭의 대부분을 준다 */
-.tmap-layout {
-  display: grid;
-  grid-template-columns: minmax(190px, 20%) minmax(0, 1fr);
-  gap: 18px;
-  align-items: start;
-}
-
 .tmap-guide {
   padding: 14px 14px 16px;
   border: 1px solid var(--border);
@@ -2695,120 +2693,6 @@ textarea.fld {
   font-size: 11.5px;
   line-height: 1.5;
   color: var(--text-3);
-}
-
-@media (max-width: 900px) {
-  .tmap-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.tmap-grid {
-  display: grid;
-  gap: 5px;
-  max-width: 760px;
-  margin: 0 auto;
-  aspect-ratio: 11 / 9;
-}
-
-.tile {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1px;
-  min-width: 0;
-  padding: 2px;
-  border: 1px solid var(--tile-bd, var(--border));
-  border-radius: var(--r-sm);
-  background: var(--tile-bg, var(--surface-2));
-  color: var(--tile-fg, var(--text-3));
-  transition: transform var(--fast) var(--ease), box-shadow var(--fast) var(--ease),
-    border-color var(--fast) var(--ease);
-}
-
-.tile:hover {
-  transform: translateY(-2px) scale(1.04);
-  box-shadow: var(--sh-2);
-  z-index: 2;
-}
-
-.tile:active {
-  transform: translateY(0) scale(1);
-}
-
-.tile.quiet {
-  --tile-bg: var(--surface-2);
-  --tile-fg: var(--text-3);
-  --tile-bd: var(--border);
-  opacity: 0.72;
-}
-
-.tile.sev-low {
-  --tile-bg: var(--sev-low-bg);
-  --tile-fg: var(--sev-low);
-  --tile-bd: var(--sev-low-bd);
-}
-.tile.sev-mid {
-  --tile-bg: var(--sev-mid-bg);
-  --tile-fg: var(--sev-mid);
-  --tile-bd: var(--sev-mid-bd);
-}
-.tile.sev-high {
-  --tile-bg: var(--sev-high-bg);
-  --tile-fg: var(--sev-high);
-  --tile-bd: var(--sev-high-bd);
-}
-
-.tile.on {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-ring), var(--sh-1);
-}
-
-.tile-code {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  line-height: 1;
-}
-
-.tile-n {
-  font-size: 13px;
-  font-weight: 850;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.tile.empty .tile-code {
-  font-weight: 700;
-}
-
-.tile-types {
-  display: flex;
-  gap: 1px;
-  font-size: 7px;
-  line-height: 1;
-  opacity: 0.85;
-}
-
-.tile-types i {
-  font-style: normal;
-}
-
-@media (max-width: 720px) {
-  .tmap-grid {
-    gap: 3px;
-  }
-  .tile-code {
-    font-size: 9px;
-  }
-  .tile-n {
-    font-size: 11px;
-  }
-  .tile-types {
-    display: none;
-  }
 }
 
 .tmap-foot {
@@ -3362,4 +3246,271 @@ textarea.fld {
   text-align: center;
   font-size: 12px;
   color: var(--text-3);
+}
+
+/* ==========================================================================
+   위험도 필터 — 유형 필터(.tf-chip)와 같은 모양. 색만 --sev-* 토큰을 쓴다
+   ========================================================================== */
+
+.sev-filter {
+  align-items: center;
+}
+
+.sev-filter-cap {
+  margin-right: 3px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+/* ==========================================================================
+   분포도 화면 — 좌(읽는 법 + 오늘의 위험) / 중(지도) / 우(국가별 상세, 스크롤)
+   ========================================================================== */
+
+.mapv {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr) 380px;
+  gap: 16px;
+  align-items: start;
+}
+
+.mapv-left {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px;
+}
+
+.mapv-left .tmap-guide {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.mapv-center {
+  padding: 8px;
+  min-width: 0;
+}
+
+/* 오른쪽 상세는 화면 높이 안에서 스스로 스크롤한다 — 페이지를 끝까지 내리지 않아도 된다 */
+.mapv-right {
+  position: sticky;
+  top: 12px;
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.mapv-right .cdl-groups {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.cdl-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.cdl-bar .cdl-title {
+  margin: 0;
+}
+
+@media (max-width: 1280px) {
+  .mapv {
+    grid-template-columns: 230px minmax(0, 1fr);
+  }
+  .mapv-right {
+    grid-column: 1 / -1;
+    position: static;
+    max-height: none;
+  }
+}
+
+@media (max-width: 800px) {
+  .mapv {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 오늘의 위험 */
+.today-risks .tmap-guide-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.today-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.today-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--bar-fg, var(--border));
+  border-radius: var(--r-sm);
+  background: var(--bar-bg, var(--surface));
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.35;
+  transition: border-color var(--fast) var(--ease);
+}
+
+.today-item:hover {
+  border-color: var(--accent);
+}
+
+.today-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.today-name {
+  color: var(--text-2, var(--text));
+  overflow-wrap: anywhere;
+}
+
+/* 실제 유럽 지도 */
+.emap {
+  position: relative;
+}
+
+.emap-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--r-md, 10px);
+  background: var(--surface-2);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.emap-svg:active {
+  cursor: grabbing;
+}
+
+.emap-state {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 900 / 760;
+  border-radius: var(--r-md, 10px);
+  background: var(--surface-2);
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.emap-state.error {
+  color: var(--sev-high);
+}
+
+.geo {
+  stroke: var(--surface);
+  stroke-width: 0.7;
+  transition: fill var(--fast) var(--ease);
+}
+
+.geo.ctx {
+  fill: var(--surface-3);
+  stroke: var(--surface-2);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* 감시 대상이지만 이번 달 이벤트가 없는 나라 — 배경 국가보다 한 단계 진하게 */
+.geo.quiet {
+  fill: var(--border-strong, #cbd2dc);
+  cursor: pointer;
+}
+
+.geo.sev-low {
+  fill: var(--sev-low);
+  cursor: pointer;
+}
+.geo.sev-mid {
+  fill: var(--sev-mid);
+  cursor: pointer;
+}
+.geo.sev-high {
+  fill: var(--sev-high);
+  cursor: pointer;
+}
+
+.geo.quiet:hover,
+.geo.sev-low:hover,
+.geo.sev-mid:hover,
+.geo.sev-high:hover {
+  filter: brightness(1.12);
+}
+
+.geo.on {
+  stroke: var(--accent);
+  stroke-width: 2.4;
+  opacity: 1;
+}
+
+.geo:focus-visible {
+  outline: none;
+  stroke: var(--accent);
+  stroke-width: 2.4;
+}
+
+.geo-badge {
+  cursor: pointer;
+}
+
+.geo-badge circle {
+  fill: rgba(15, 23, 42, 0.88);
+  stroke: #fff;
+  stroke-width: 1.4;
+  vector-effect: non-scaling-stroke;
+}
+
+.geo-badge text {
+  fill: #fff;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.emap-zoom {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.emap-zoom button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: var(--sh-1);
+}
+
+.emap-zoom button:hover {
+  border-color: var(--accent);
 }

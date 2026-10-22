@@ -5,7 +5,6 @@ import { CalendarScreen } from './components/CalendarScreen'
 import { InfoScreen } from './components/InfoScreen'
 import { AdminScreenContainer } from './components/AdminScreenContainer'
 import { LoginPanel } from './components/LoginPanel'
-import { loadPrefs, savePrefs } from './lib/prefs'
 import { readUrl, writeUrl } from './lib/urlState'
 import { currentUser, onAuth, signOut } from './lib/auth'
 import type { Session } from '@supabase/supabase-js'
@@ -24,9 +23,8 @@ import type { Session } from '@supabase/supabase-js'
  */
 export default function App() {
   const url0 = useMemo(() => readUrl(), [])
-  const prefs0 = useMemo(() => loadPrefs(), [])
-
-  const [lang, setLang] = useState<Lang>(prefs0.lang)
+  /** 화면 언어는 영어로 고정한다 (2026-10-22 사용자 지시). 상태로 두지 않는다 */
+  const lang: Lang = 'en'
   const [screen, setScreen] = useState<Screen>(url0.screen ?? 'calendar')
   const [toast, setToast] = useState<string | null>(null)
   const [session, setSession] = useState<Session | null>(null)
@@ -63,10 +61,6 @@ export default function App() {
 
   useEffect(() => () => clearTimeout(timer.current), [])
 
-  useEffect(() => {
-    savePrefs({ lang })
-  }, [lang])
-
   // 캘린더는 자기 상태(날짜·국가·뷰)를 스스로 URL에 쓴다. 나머지 화면만 여기서 맞춘다
   useEffect(() => {
     if (screen !== 'calendar') writeUrl({ screen })
@@ -76,7 +70,6 @@ export default function App() {
     <div className="app-shell">
       <Header
         lang={lang}
-        onLang={setLang}
         screen={screen}
         onScreen={setScreen}
         userEmail={user?.email ?? null}
