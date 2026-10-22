@@ -70,7 +70,7 @@ export function CountryPicker({ lang, countries, counts, value, onChange }: Prop
         aria-haspopup="dialog"
       >
         <span className="cp-cap">{t('myCountry')}</span>
-        <span className="cp-val">{value ?? `${t('allCountries')} (${countries.length})`}</span>
+        <span className="cp-val">{value ?? t('allCountries')}</span>
         <span className="cp-caret" aria-hidden="true">
           ▾
         </span>
@@ -106,7 +106,6 @@ export function CountryPicker({ lang, countries, counts, value, onChange }: Prop
               }}
             >
               {t('allCountries')}
-              <span className="cp-n">{countries.length}</span>
             </button>
 
             {shown.map((c) => {
