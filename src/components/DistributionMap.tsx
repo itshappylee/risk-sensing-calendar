@@ -1,12 +1,15 @@
-import { useMemo } from 'react'
-import type { CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { KeyboardEvent, PointerEvent } from 'react'
 import type { Lang, RiskEvent } from '../lib/types'
-import { GROUP_META, GROUP_OF, severityBand, severityLabel, type TypeGroup } from '../lib/eventMeta'
+import { severityBand, severityLabel, type SeverityBand } from '../lib/eventMeta'
 import { makeT } from '../lib/i18n'
-import { COUNTRY_POINTS, findPoint } from '../lib/geo'
+import { findPoint } from '../lib/geo'
+import { MAP_H, MAP_W, loadEuropeMap, type EuropeMap } from '../lib/europeMap'
 
 interface Props {
   lang: Lang
+  /** 유형·위험도 필터까지 적용한 목록. **국가 필터는 적용하지 않은 것**을 넘겨야 한다 —
+   *  국가를 눌렀을 때 다른 나라가 회색으로 바뀌면 비교가 안 된다 */
   events: RiskEvent[]
   selectedCountry: string | null
   onPickCountry: (c: string | null) => void
@@ -15,141 +18,217 @@ interface Props {
 interface Cell {
   count: number
   max: number
-  groups: Set<TypeGroup>
 }
 
+const MIN_ZOOM = 1
+const MAX_ZOOM = 6
+
 /**
- * 지도 분포도 — **타일 그리드 맵**.
+ * 분포도 — **실제 유럽 지도**.
  *
- * 각 국가를 같은 크기 타일로 놓되 지리적 배치에 맞춘다.
+ * 전에는 국가를 같은 크기 타일로 놓은 타일 그리드였다. 면적이 판정에 영향을 주는 것처럼
+ * 보이지 않게 하려는 의도였지만, 담당자에게는 '어디가 어디인지' 바로 읽히는 실제 지도가 낫다는
+ * 요청이 있었다 (→ 사용자 요청 2026-10-22).
  *
- * 왜 실제 지도(면적)가 아닌가: [[business-rules]]는 severity를 **국가 규모와 무관하게**
- * 판정한다 — "파업은 인원수가 아니라 부문으로 판정한다. 항만 크레인 기사 50명이
- * 항구 전체를 멈출 수 있다." 면적으로 그리면 룩셈부르크·몰타의 severity 5가
- * 독일의 severity 1보다 작아 보여 **판정 원칙과 반대되는 인상**을 준다.
- * 타일은 모든 국가에 같은 시각적 무게를 준다.
- *
- * 부수 효과: 국경 데이터가 필요 없어 **지어낸 지리 정보가 하나도 없다.**
- * 배치가 실제 지리와 어긋나지 않는지는 `lat`/`lon`으로 회귀 테스트가 검증한다.
+ * 면적 문제는 이렇게 푼다: 색은 **그 나라의 최고 위험도**, 숫자는 **건수**이고, 둘 다 면적과 무관하다.
+ * 몰타·룩셈부르크처럼 지도에서 점만 한 나라도 숫자 배지가 같은 크기로 붙으므로 작게 보이지 않는다.
+ * 지도 모양은 `world-atlas`(Natural Earth)이며 화면에 그리는 용도뿐이다 (→ lib/europeMap.ts).
  */
 export function DistributionMap({ lang, events, selectedCountry, onPickCountry }: Props) {
   const t = makeT(lang)
 
-  const { cells, unmapped, rows, cols } = useMemo(() => {
-    const map = new Map<string, Cell>()
-    const missing = new Set<string>()
+  const [map, setMap] = useState<EuropeMap | null>(null)
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    let off = false
+    loadEuropeMap()
+      .then((m) => {
+        if (!off) setMap(m)
+      })
+      .catch(() => {
+        if (!off) setFailed(true)
+      })
+    return () => {
+      off = true
+    }
+  }, [])
 
+  const { cells, unmapped } = useMemo(() => {
+    const m = new Map<string, Cell>()
+    const missing = new Set<string>()
     for (const e of events) {
       const p = findPoint(e.country)
       if (!p) {
         missing.add(e.country)
         continue
       }
-      const cur = map.get(p.code) ?? { count: 0, max: 0, groups: new Set<TypeGroup>() }
+      const cur = m.get(p.name) ?? { count: 0, max: 0 }
       cur.count++
       cur.max = Math.max(cur.max, e.severity)
-      cur.groups.add(GROUP_OF[e.event_type])
-      map.set(p.code, cur)
+      m.set(p.name, cur)
     }
-
-    return {
-      cells: map,
-      unmapped: [...missing],
-      rows: Math.max(...COUNTRY_POINTS.map((p) => p.row)) + 1,
-      cols: Math.max(...COUNTRY_POINTS.map((p) => p.col)) + 1,
-    }
+    return { cells: m, unmapped: [...missing] }
   }, [events])
 
-  const gridStyle = {
-    gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-    gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
-  } as CSSProperties
+  // --- 확대·이동 ---------------------------------------------------------
+  const [view, setView] = useState({ k: 1, x: 0, y: 0 })
+  const drag = useRef<{ px: number; py: number; vx: number; vy: number; moved: boolean } | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
+
+  const clamp = (k: number, x: number, y: number) => {
+    // 지도가 화면 밖으로 완전히 사라지지 않게 가장자리를 묶는다
+    const minX = MAP_W - MAP_W * k
+    const minY = MAP_H - MAP_H * k
+    return { k, x: Math.min(0, Math.max(minX, x)), y: Math.min(0, Math.max(minY, y)) }
+  }
+
+  const zoomBy = (factor: number) =>
+    setView((v) => {
+      const k = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, v.k * factor))
+      // 화면 중앙을 고정한 채 확대한다
+      const cx = MAP_W / 2
+      const cy = MAP_H / 2
+      const x = cx - ((cx - v.x) / v.k) * k
+      const y = cy - ((cy - v.y) / v.k) * k
+      return clamp(k, x, y)
+    })
+
+  const onPointerDown = (e: PointerEvent<SVGSVGElement>) => {
+    drag.current = { px: e.clientX, py: e.clientY, vx: view.x, vy: view.y, moved: false }
+  }
+  const onPointerMove = (e: PointerEvent<SVGSVGElement>) => {
+    const d = drag.current
+    const svg = svgRef.current
+    if (!d || !svg) return
+    const dx = e.clientX - d.px
+    const dy = e.clientY - d.py
+    if (!d.moved && Math.hypot(dx, dy) < 5) return
+    d.moved = true
+    // 화면 픽셀 → 지도 좌표
+    const scale = MAP_W / svg.getBoundingClientRect().width
+    setView((v) => clamp(v.k, d.vx + dx * scale, d.vy + dy * scale))
+  }
+  const endDrag = () => {
+    // click은 pointerup 뒤에 오므로 바로 지우지 않는다 — 끌었으면 클릭으로 치지 않기 위해
+    window.setTimeout(() => {
+      drag.current = null
+    }, 0)
+  }
+  const pick = (name: string, on: boolean) => {
+    if (drag.current?.moved) return
+    onPickCountry(on ? null : name)
+  }
+  const onKey = (e: KeyboardEvent<SVGPathElement>, name: string, on: boolean) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onPickCountry(on ? null : name)
+    }
+  }
+
+  const bandOf = (name: string): SeverityBand | null => {
+    const c = cells.get(name)
+    return c ? severityBand(c.max) : null
+  }
+
+  // 그리는 순서: 배경 → 감시 국가 → 선택한 국가(테두리가 이웃에 가려지지 않도록 맨 위)
+  const ordered = useMemo(() => {
+    if (!map) return []
+    const rank = (c: string | null) => (c === null ? 0 : c === selectedCountry ? 2 : 1)
+    return [...map.shapes].sort((a, b) => rank(a.country) - rank(b.country))
+  }, [map, selectedCountry])
 
   return (
     <div className="tmap">
-      <div className="tmap-layout">
-        {/* 좌측 20% — 색과 숫자가 무슨 뜻인지. 지도만 있으면 숫자 3이 '3건'인지 '3점'인지 알 수 없다 */}
-        <aside className="tmap-guide" aria-label={t('mapGuideTitle')}>
-          <h3 className="tmap-guide-title">{t('mapGuideTitle')}</h3>
+      <div className="emap">
+        {!map && !failed && <div className="emap-state">{t('mapLoading')}</div>}
+        {failed && <div className="emap-state error">{t('mapLoadFailed')}</div>}
 
-          <p className="tmap-guide-h">{t('mapGuideColor')}</p>
-          <ul className="tmap-guide-list">
-            <li className="sev-key sev-low">
-              <span className="sev-key-dot" />
-              {t('mapGuideLow')}
-            </li>
-            <li className="sev-key sev-mid">
-              <span className="sev-key-dot" />
-              {t('mapGuideMid')}
-            </li>
-            <li className="sev-key sev-high">
-              <span className="sev-key-dot" />
-              {t('mapGuideHigh')}
-            </li>
-            <li className="sev-key sev-none">
-              <span className="sev-key-dot" />
-              {t('mapGuideNone')}
-            </li>
-          </ul>
-
-          <p className="tmap-guide-h">{t('mapGuideNumber')}</p>
-          <p className="tmap-guide-desc">{t('mapGuideNumberDesc')}</p>
-
-          {unmapped.length > 0 && (
-            <p className="dm-unmapped">
-              ⚠️ {t('mapUnmapped')}: {unmapped.join(', ')}
-            </p>
-          )}
-        </aside>
-
-        <div className="tmap-main">
-          <div className="tmap-grid" style={gridStyle} role="group" aria-label={t('viewMap')}>
-        {COUNTRY_POINTS.map((p) => {
-          const c = cells.get(p.code)
-          const band = c ? severityBand(c.max) : null
-          const on = selectedCountry === p.name
-          const style = { gridRow: p.row + 1, gridColumn: p.col + 1 } as CSSProperties
-
-          return (
-            <button
-              key={p.code}
-              className={[
-                'tile',
-                band ? `sev-${band}` : 'quiet',
-                on ? 'on' : '',
-                c ? '' : 'empty',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-              style={style}
-              onClick={() => onPickCountry(on ? null : p.name)}
-              aria-pressed={on}
-              title={
-                c
-                  ? `${p.name} · ${c.count} · ${severityLabel(c.max, lang)}`
-                  : `${p.name} · ${t('noEvents')}`
-              }
-              aria-label={
-                c
-                  ? `${p.name}, ${c.count}, ${severityLabel(c.max, lang)}`
-                  : `${p.name}, ${t('noEvents')}`
-              }
+        {map && (
+          <>
+            <svg
+              ref={svgRef}
+              className="emap-svg"
+              viewBox={`0 0 ${MAP_W} ${MAP_H}`}
+              role="group"
+              aria-label={t('viewMap')}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={endDrag}
+              onPointerLeave={endDrag}
             >
-              <span className="tile-code">{p.code}</span>
-              {c && <span className="tile-n">{c.count}</span>}
-              {c && (
-                <span className="tile-types" aria-hidden="true">
-                  {[...c.groups].slice(0, 3).map((g) => (
-                    <i key={g}>{GROUP_META[g]?.icon}</i>
-                  ))}
-                </span>
-              )}
-            </button>
-          )
-        })}
-          </div>
-        </div>
+              <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
+                {ordered.map((s, i) => {
+                  if (s.country === null) return <path key={i} className="geo ctx" d={s.d} />
+                  const band = bandOf(s.country)
+                  const on = selectedCountry === s.country
+                  const c = cells.get(s.country)
+                  const label = c
+                    ? `${s.country} · ${c.count} · ${severityLabel(c.max, lang)}`
+                    : `${s.country} · ${t('noEvents')}`
+                  return (
+                    <path
+                      key={i}
+                      className={['geo', band ? `sev-${band}` : 'quiet', on ? 'on' : ''].filter(Boolean).join(' ')}
+                      d={s.d}
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={on}
+                      aria-label={label}
+                      vectorEffect="non-scaling-stroke"
+                      onClick={() => pick(s.country!, on)}
+                      onKeyDown={(e) => onKey(e, s.country!, on)}
+                    >
+                      <title>{label}</title>
+                    </path>
+                  )
+                })}
+
+                {/* 건수 배지 — 지도에서 점만 한 나라도 같은 크기로 보이게 한다 */}
+                {[...cells.entries()].map(([name, c]) => {
+                  const pos = map.labels[name]
+                  if (!pos) return null
+                  const r = 11 / view.k
+                  return (
+                    <g
+                      key={name}
+                      className={`geo-badge sev-${severityBand(c.max)}`}
+                      transform={`translate(${pos.x} ${pos.y})`}
+                      onClick={() => pick(name, selectedCountry === name)}
+                    >
+                      <circle r={r} />
+                      <text fontSize={11 / view.k} dy="0.35em" textAnchor="middle">
+                        {c.count}
+                      </text>
+                    </g>
+                  )
+                })}
+              </g>
+            </svg>
+
+            <div className="emap-zoom" role="group">
+              <button onClick={() => zoomBy(1.5)} aria-label={t('mapZoomIn')} title={t('mapZoomIn')}>
+                +
+              </button>
+              <button onClick={() => zoomBy(1 / 1.5)} aria-label={t('mapZoomOut')} title={t('mapZoomOut')}>
+                −
+              </button>
+              <button
+                onClick={() => setView({ k: 1, x: 0, y: 0 })}
+                aria-label={t('mapZoomReset')}
+                title={t('mapZoomReset')}
+              >
+                ↺
+              </button>
+            </div>
+          </>
+        )}
       </div>
+
+      {unmapped.length > 0 && (
+        <p className="dm-unmapped">
+          ⚠️ {t('mapUnmapped')}: {unmapped.join(', ')}
+        </p>
+      )}
     </div>
   )
 }

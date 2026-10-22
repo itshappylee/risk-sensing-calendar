@@ -29,13 +29,14 @@ function cell(v: string | number | null | undefined): string {
   // ① CSV 인젝션 — 데이터가 외부 크롤링에서 오므로 =·+·-·@로 시작하면 엑셀이 수식으로 실행한다
   const guarded = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s
 
-  // ② 쉼표·따옴표·줄바꿈이 든 값은 감싸고 따옴표는 두 번 쓴다 (summary·severity_reason에 흔하다)
+  // ② 쉼표·따옴표·줄바꿈이 든 값은 감싸고 따옴표는 두 번 쓴다 (event_name에도 생긴다)
+  //    summary·severity_reason 컬럼은 2026-10-22에 내보내기에서 뺐다 (사용자 요청)
   return /[",\n\r]/.test(guarded) ? `"${guarded.replace(/"/g, '""')}"` : guarded
 }
 
 const COLUMNS = [
     'date_start', 'date_end', 'country', 'region', 'type', 'severity', 'grade', 'status',
-    'event_name', 'summary', 'severity_reason', 'transport_mode', 'time_start', 'time_end',
+    'event_name', 'transport_mode', 'time_start', 'time_end',
     'verified', 'source_url', 'updated_at',
 ]
 
@@ -66,8 +67,6 @@ export function buildCsv(events: RiskEvent[], opts: { country: string | null }):
         severityLabel(e.severity, CSV_LANG),
         e.status,
         e.event_name,
-        e.summary,
-        e.severity_reason,
         transportLabel(e.transport_mode, CSV_LANG),
         e.time_start ?? '',
         e.time_end ?? '',

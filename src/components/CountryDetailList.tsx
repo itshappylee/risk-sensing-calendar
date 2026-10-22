@@ -10,6 +10,9 @@ interface Props {
   events: RiskEvent[]
   /** 로그인한 관리자만 제외할 수 있다. null이면 버튼을 감춘다 */
   onExclude?: ((eventId: string) => void) | null
+  /** 지도에서 고른 국가. 있으면 머리말에 표시하고 '전체 보기'를 둔다 (목록은 이미 그 나라로 걸러져 온다) */
+  selectedCountry?: string | null
+  onClearCountry?: () => void
 }
 
 function hostOf(url: string): string {
@@ -29,7 +32,7 @@ function hostOf(url: string): string {
  *
  * 정렬은 위험도 우선이다. 심각한 나라를 스크롤로 찾게 하지 않는다.
  */
-export function CountryDetailList({ lang, events, onExclude }: Props) {
+export function CountryDetailList({ lang, events, onExclude, selectedCountry, onClearCountry }: Props) {
   const t = makeT(lang)
 
   const groups = useMemo(() => {
@@ -52,13 +55,32 @@ export function CountryDetailList({ lang, events, onExclude }: Props) {
       .sort((a, b) => b.max - a.max || b.items.length - a.items.length || a.country.localeCompare(b.country))
   }, [events])
 
+  const head = (
+    <div className="cdl-bar">
+      <h3 className="cdl-title">
+        {t('byCountryTitle')}
+        {selectedCountry ? ` · ${selectedCountry}` : ''}
+      </h3>
+      {selectedCountry && onClearCountry && (
+        <button className="btn tiny" onClick={onClearCountry}>
+          {t('mapClearCountry')}
+        </button>
+      )}
+    </div>
+  )
+
   if (groups.length === 0) {
-    return <div className="detail-empty">{t('noEvents')}</div>
+    return (
+      <section className="cdl" aria-label={t('byCountryTitle')}>
+        {head}
+        <div className="detail-empty">{t('noEvents')}</div>
+      </section>
+    )
   }
 
   return (
     <section className="cdl" aria-label={t('byCountryTitle')}>
-      <h3 className="cdl-title">{t('byCountryTitle')}</h3>
+      {head}
 
       <div className="cdl-groups">
         {groups.map(({ country, items, max }) => (

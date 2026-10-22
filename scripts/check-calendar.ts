@@ -174,8 +174,9 @@ ok(one.total === 1, '하루짜리는 1일 (연속 표시 안 함)')
 console.log('\n=== CSV 내보내기 ===')
 const csv = buildCsv(SAMPLE_EVENTS, { country: null })
 const lines = csv.split('\r\n')
-ok(lines[0] === 'date_start,date_end,country,region,type,severity,grade,status,event_name,summary,severity_reason,transport_mode,time_start,time_end,verified,source_url,updated_at',
-   'CSV 머리글이 영어 컬럼 17개다')
+ok(lines[0] === 'date_start,date_end,country,region,type,severity,grade,status,event_name,transport_mode,time_start,time_end,verified,source_url,updated_at',
+   'CSV 머리글이 영어 컬럼 15개다 (summary·severity_reason 제외)')
+ok(!csv.split('\r\n')[0].includes('summary') && !csv.split('\r\n')[0].includes('severity_reason'), 'CSV에 summary·severity_reason 컬럼이 없다')
 // 따옴표 안 쉼표 때문에 split(',')로는 열을 셀 수 없다 — 제대로 파싱한다
 const parseCsvLine = (line: string): string[] => {
   const out: string[] = []
@@ -198,7 +199,7 @@ const parseCsvLine = (line: string): string[] => {
 // 앱이 만드는 값(유형 라벨·등급·운송수단)은 전부 영어여야 한다.
 // event_name·summary·severity_reason은 DB에서 온 원문이라 앱이 번역할 수 없다 —
 // 그 언어는 n8n WF-2가 결정한다 (→ Q-026).
-const APP_COLS = { type: 4, grade: 6, mode: 11 }
+const APP_COLS = { type: 4, grade: 6, mode: 9 }
 const appVals = lines
   .slice(1)
   .filter((l) => l && !l.includes('# '))
@@ -222,16 +223,16 @@ ok(
 ok(csv.includes('not being collected'), 'CSV에도 미수집 경고가 들어간다 (영어)')
 ok(csv.includes('unverified items'), 'CSV에 미검증 제외 안내가 들어간다')
 
-// 쉼표·따옴표가 든 값이 깨지면 열이 밀린다 — summary·severity_reason에 흔하다
+// 쉼표·따옴표가 든 값이 깨지면 열이 밀린다
 const q = String.fromCharCode(34) // "
 const tricky = [
   {
     ...SAMPLE_EVENTS[0],
     event_id: 'T1',
     event_name: `파업, 그리고 ${q}확대${q}`,
-    summary: '줄바꿈\n포함',
-    severity_reason: 'a,b,c',
   },
+  { ...SAMPLE_EVENTS[0], event_id: 'T2', event_name: '줄바꿈\n포함' },
+  { ...SAMPLE_EVENTS[0], event_id: 'T3', event_name: 'a,b,c' },
 ]
 const t1 = buildCsv(tricky, { country: null })
 ok(t1.includes(`${q}파업, 그리고 ${q}${q}확대${q}${q}${q}`), '따옴표가 CSV 규칙대로 두 번 쓰인다')
@@ -239,7 +240,10 @@ ok(t1.includes(`${q}줄바꿈\n포함${q}`), '줄바꿈이 든 값이 따옴표�
 ok(t1.includes(`${q}a,b,c${q}`), '쉼표가 든 값이 따옴표로 감싸진다')
 
 // 데이터가 외부 크롤링에서 오므로 =·+·@로 시작하면 엑셀이 수식으로 실행한다
-const evil = [{ ...SAMPLE_EVENTS[0], event_id: 'X1', event_name: '=1+1', summary: '@SUM(A1)' }]
+const evil = [
+  { ...SAMPLE_EVENTS[0], event_id: 'X1', event_name: '=1+1' },
+  { ...SAMPLE_EVENTS[0], event_id: 'X2', event_name: '@SUM(A1)' },
+]
 const t2 = buildCsv(evil, { country: null })
 ok(t2.includes("'=1+1"), 'CSV 인젝션 방어 — = 로 시작하는 값에 따옴표 접두')
 ok(t2.includes("'@SUM(A1)"), 'CSV 인젝션 방어 — @ 로 시작하는 값에 따옴표 접두')

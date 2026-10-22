@@ -74,6 +74,22 @@ export function severityLabel(severity: number, lang: Lang): string {
   return labels[band][lang]
 }
 
+/** 위험도 필터·범례에 노출하는 순서 (낮음 → 높음) */
+export const SEVERITY_BANDS: SeverityBand[] = ['low', 'mid', 'high']
+
+/** 필터 칩에 적는 점수 범위. 위 `severityBand`와 같은 경계를 쓴다 (1–2 / 3 / 4–5) */
+export const SEVERITY_RANGE: Record<SeverityBand, string> = {
+  low: '1–2',
+  mid: '3',
+  high: '4–5',
+}
+
+export const SEVERITY_NAME: Record<SeverityBand, Record<Lang, string>> = {
+  low: { ko: '낮음', en: 'Low' },
+  mid: { ko: '보통', en: 'Medium' },
+  high: { ko: '높음', en: 'High' },
+}
+
 /**
  * 운송수단 — `events.transport_mode`(road/rail/air/sea)와 대응.
  * 아이콘은 경로 분석(2b)과 위험 보고(2d)가 함께 쓴다.

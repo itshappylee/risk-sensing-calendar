@@ -5,7 +5,7 @@ import { buildMonthWeeks, eventsOnDay, parseISODate, toISODate } from '../lib/ca
 import { fetchEvents, type LoadState } from '../lib/supabase'
 import { isActiveRisk } from '../lib/changes'
 import { setEventStatus } from '../lib/candidates'
-import { GROUP_OF, type TypeGroup } from '../lib/eventMeta'
+import { GROUP_OF, severityBand, type SeverityBand, type TypeGroup } from '../lib/eventMeta'
 import { COUNTRIES } from '../lib/locations'
 import { loadPrefs, savePrefs } from '../lib/prefs'
 import { buildCsv, downloadCsv } from '../lib/exportCsv'
@@ -18,6 +18,9 @@ import { DataFreshness } from './DataFreshness'
 import { MonthGrid } from './MonthGrid'
 import { RiskList } from './RiskList'
 import { TypeFilter } from './TypeFilter'
+import { SeverityFilter } from './SeverityFilter'
+import { MapGuide } from './MapGuide'
+import { TodayRisks } from './TodayRisks'
 import { DayDetail } from './DayDetail'
 import { CountryDetailList } from './CountryDetailList'
 
@@ -66,6 +69,8 @@ export function CalendarScreen({ lang, onToast, initial, reporter }: Props) {
   /** 새로고침 트리거 — 값이 바뀌면 재조회한다 */
   /** 유형 필터 — 비어 있으면 전체 */
   const [types, setTypes] = useState<Set<TypeGroup>>(new Set())
+  /** 위험도 필터 — 낮음(1–2)/보통(3)/높음(4–5). 비어 있으면 전체 */
+  const [bands, setBands] = useState<Set<SeverityBand>>(new Set())
 
   const year = cursor.getFullYear()
   const month = cursor.getMonth()
@@ -114,29 +119,43 @@ export function CalendarScreen({ lang, onToast, initial, reporter }: Props) {
     return m
   }, [state.events])
 
-  const visibleEvents = useMemo(
-    () => (country === ALL ? state.events : state.events.filter((e) => e.country === country)),
-    [state.events, country],
-  )
-
   /**
-   * 집계·판정에 쓰는 것.
+   * 집계·판정에 쓰는 것 (국가 필터 전).
    * - 취소된 건 더 이상 위험이 아니다 (WF-3 "본문에서 뺀다")
    * - **출처 확인이 안 된 건(`verified != 'yes'`)은 캘린더에서 뺀다** (→ 사용자 결정 2026-08-26).
    *   검증된 것과 섞이면 혼선이 생긴다. 관리자 화면에서는 그대로 보인다.
    */
-  const activeEvents = useMemo(
-    () => visibleEvents.filter((e) => isActiveRisk(e) && e.verified === 'yes'),
-    [visibleEvents],
+  const activeAll = useMemo(
+    () => state.events.filter((e) => isActiveRisk(e) && e.verified === 'yes'),
+    [state.events],
   )
 
-  /** 유형 필터를 적용한 최종 목록. 아무 유형도 안 고르면 전체를 뜻한다 */
+  const inCountry = (e: RiskEvent) => country === ALL || e.country === country
+  const passType = (e: RiskEvent) => types.size === 0 || types.has(GROUP_OF[e.event_type])
+  const passBand = (e: RiskEvent) => bands.size === 0 || bands.has(severityBand(e.severity))
+
+  /** 국가 필터까지만 적용된 목록 — 유형·위험도 칩의 건수는 이것을 기준으로 센다 */
+  const activeEvents = useMemo(
+    () => activeAll.filter(inCountry),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeAll, country],
+  )
+
+  /**
+   * 유형·위험도 필터까지 적용하고 **국가 필터는 적용하지 않은** 목록 — 지도용.
+   * 국가를 눌러도 지도는 전체 나라의 색을 유지해야 다른 나라와 비교할 수 있다.
+   */
+  const mapEvents = useMemo(
+    () => activeAll.filter((e) => passType(e) && passBand(e)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeAll, types, bands],
+  )
+
+  /** 모든 필터를 적용한 최종 목록. 유형·위험도를 안 고르면 각각 전체를 뜻한다 */
   const shownEvents = useMemo(
-    () =>
-      types.size === 0
-        ? activeEvents
-        : activeEvents.filter((e) => types.has(GROUP_OF[e.event_type])),
-    [activeEvents, types],
+    () => mapEvents.filter(inCountry),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mapEvents, country],
   )
 
   const toggleType = (g: TypeGroup) =>
@@ -146,6 +165,15 @@ export function CalendarScreen({ lang, onToast, initial, reporter }: Props) {
       else next.add(g)
       // 전부 고르면 필터가 없는 것과 같다 — 비워서 "전체"로 되돌린다
       return next.size === 4 ? new Set() : next
+    })
+
+  const toggleBand = (b: SeverityBand) =>
+    setBands((prev) => {
+      const next = new Set(prev)
+      if (next.has(b)) next.delete(b)
+      else next.add(b)
+      // 전부 고르면 필터가 없는 것과 같다 — 비워서 "전체"로 되돌린다
+      return next.size === 3 ? new Set() : next
     })
 
 
@@ -264,19 +292,32 @@ export function CalendarScreen({ lang, onToast, initial, reporter }: Props) {
           onChange={(c) => setCountry(c ?? ALL)}
         />
 
-        <TypeFilter lang={lang} events={activeEvents} selected={types} onToggle={toggleType} />
+        <TypeFilter
+          lang={lang}
+          events={activeEvents.filter(passBand)}
+          selected={types}
+          onToggle={toggleType}
+        />
 
-        {/* 필터 초기화 — 국가·유형을 한 번에 푼다 (사용자 요청 2026-08-26).
+        <SeverityFilter
+          lang={lang}
+          events={activeEvents.filter(passType)}
+          selected={bands}
+          onToggle={toggleBand}
+        />
+
+        {/* 필터 초기화 — 국가·유형·위험도를 한 번에 푼다 (사용자 요청 2026-08-26).
             여러 칩을 하나씩 다시 눌러 되돌리는 게 번거롭다는 지적에서 나왔다.
-            '전체' 상태 = 국가 ALL + 유형 선택 없음(= 전부 표시)이므로 그 상태로 되돌린다.
+            '전체' 상태 = 국가 ALL + 유형·위험도 선택 없음(= 전부 표시)이므로 그 상태로 되돌린다.
             걸린 필터가 없으면 비활성 — 눌러도 아무 일이 없는 버튼을 활성으로 두지 않는다. */}
         <button
           className="btn btn-reset"
           onClick={() => {
             setCountry(ALL)
             setTypes(new Set())
+            setBands(new Set())
           }}
-          disabled={country === ALL && types.size === 0}
+          disabled={country === ALL && types.size === 0 && bands.size === 0}
           title={t('resetFiltersHint')}
         >
           ↺ {t('resetFilters')}
@@ -302,20 +343,38 @@ export function CalendarScreen({ lang, onToast, initial, reporter }: Props) {
 
       <div className={`cal-main${view === 'month' ? '' : ' full'}`} key={view}>
         {view === 'map' && (
-          <>
-            <div className="panel">
-              <DistributionMap
+          <div className="mapv">
+            {/* 좌: 읽는 법 + 오늘의 위험. 예전에는 아래가 빈 여백이었다 */}
+            <aside className="mapv-left panel">
+              <MapGuide lang={lang} />
+              <TodayRisks
                 lang={lang}
                 events={shownEvents}
+                onPickCountry={(c) => setCountry(c ?? ALL)}
+              />
+            </aside>
+
+            {/* 가운데: 실제 유럽 지도. 국가를 골라도 다른 나라의 색은 그대로 둔다 */}
+            <div className="mapv-center panel">
+              <DistributionMap
+                lang={lang}
+                events={mapEvents}
                 selectedCountry={country === ALL ? null : country}
                 onPickCountry={(c) => setCountry(c ?? ALL)}
               />
             </div>
-            {/* 타일만으로는 '무슨 일이 왜 그 점수인지'를 알 수 없다 → 국가별 상세 카드를 아래에 편다 */}
-            <div className="panel cdl-panel">
-              <CountryDetailList lang={lang} events={shownEvents} onExclude={excludeEvent} />
-            </div>
-          </>
+
+            {/* 우: 국가별 상세. 스크롤로 본다. 국가를 고르면 그 나라만 남는다 */}
+            <aside className="mapv-right panel cdl-panel">
+              <CountryDetailList
+                lang={lang}
+                events={shownEvents}
+                onExclude={excludeEvent}
+                selectedCountry={country === ALL ? null : country}
+                onClearCountry={() => setCountry(ALL)}
+              />
+            </aside>
+          </div>
         )}
         {view === 'month' ? (
           <>
