@@ -284,6 +284,26 @@ export function CalendarScreen({ lang, onToast, initial, reporter }: Props) {
           {t('today')}
         </button>
 
+        <span className="toolbar-spacer" />
+
+        <button
+          className="btn"
+          onClick={() => {
+            downloadCsv(
+              buildCsv(shownEvents, { country: country === ALL ? null : country }),
+              `SELS_${toISODate(cursor).slice(0, 7)}${country === ALL ? '' : `_${country}`}.csv`,
+            )
+            onToast(t('exported'))
+          }}
+        >
+          ↓ {t('exportCsv')}
+        </button>
+
+        {loading && <span className="detail-count">{t('loading')}</span>}
+
+        {/* 줄바꿈: 내 국가 ~ 위험도 필터는 보기 전환(Month/Map/Urgency) 줄 아래에 둔다 (사용자 요청 2026-10-22) */}
+        <span className="toolbar-break" />
+
         <CountryPicker
           lang={lang}
           countries={COUNTRIES}
@@ -323,22 +343,6 @@ export function CalendarScreen({ lang, onToast, initial, reporter }: Props) {
           ↺ {t('resetFilters')}
         </button>
 
-        <span className="toolbar-spacer" />
-
-        <button
-          className="btn"
-          onClick={() => {
-            downloadCsv(
-              buildCsv(shownEvents, { country: country === ALL ? null : country }),
-              `SELS_${toISODate(cursor).slice(0, 7)}${country === ALL ? '' : `_${country}`}.csv`,
-            )
-            onToast(t('exported'))
-          }}
-        >
-          ↓ {t('exportCsv')}
-        </button>
-
-        {loading && <span className="detail-count">{t('loading')}</span>}
       </div>
 
       <div className={`cal-main${view === 'month' ? '' : ' full'}`} key={view}>
