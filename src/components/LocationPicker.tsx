@@ -22,6 +22,14 @@ interface Props {
   idPrefix: string
   /** 라벨을 감춘 압축형(경유지 줄 등)에서 쓴다 */
   compact?: boolean
+  /**
+   * 나라만 고르게 한다 (도시 칸을 숨긴다).
+   *
+   * 경로 분석은 지리 축이 **국가 단위**다 (→ DEC-022). 도시를 받아도 판정에 쓰이지 않아
+   * "입력했는데 아무 영향이 없는 칸"이었다. 2026-10-14에 사용자 요청으로 뺐다.
+   * ⚠️ 위험 보고(2d)는 도시가 필요하다 — 그래서 이 컴포넌트를 지우지 않고 옵션으로 둔다.
+   */
+  countryOnly?: boolean
 }
 
 /**
@@ -33,7 +41,7 @@ interface Props {
  * 2026-09-09부터 기본 `<select>` 대신 [[PickList]]를 쓴다. 국가가 42개라 기본 드롭다운이
  * 화면 위아래를 다 덮을 만큼 길어졌고, 그 높이는 CSS로 줄일 수 없다.
  */
-export function LocationPicker({ lang, value, onChange, idPrefix, compact = false }: Props) {
+export function LocationPicker({ lang, value, onChange, idPrefix, compact = false, countryOnly = false }: Props) {
   const t = makeT(lang)
   const cities = cityOptions(value.country)
 
@@ -51,6 +59,23 @@ export function LocationPicker({ lang, value, onChange, idPrefix, compact = fals
     () => cities.map((c) => ({ value: c, label: c === OTHER_CITY ? t('otherCity') : c })),
     [cities, t],
   )
+
+  if (countryOnly) {
+    // 바깥에서 이미 "출발지/도착지/경유지" 라벨을 달아 준다. 여기서 "나라"를 또 쓰면 두 줄이 된다
+    return (
+      <>
+        <PickList
+          lang={lang}
+          id={`${idPrefix}-country`}
+          ariaLabel={t('fieldCountry')}
+          value={value.country}
+          options={countryOptions}
+          placeholder={t('selectPlaceholder')}
+          onChange={(country) => onChange({ country, city: '', customCity: '' })}
+        />
+      </>
+    )
+  }
 
   return (
     <>

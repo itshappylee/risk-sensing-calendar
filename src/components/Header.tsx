@@ -1,7 +1,7 @@
 import type { Lang } from '../lib/types'
 import { makeT } from '../lib/i18n'
 
-export type Screen = 'calendar' | 'info' | 'admin'
+export type Screen = 'calendar' | 'route' | 'info' | 'admin'
 
 interface Props {
   lang: Lang
@@ -48,6 +48,13 @@ export function Header({ lang, screen, onScreen, userEmail, onSignIn, onSignOut 
           onClick={() => onScreen('calendar')}
         >
           {t('navCalendar')}
+        </button>
+        <button
+          className={screen === 'route' ? 'on' : ''}
+          aria-current={screen === 'route' ? 'page' : undefined}
+          onClick={() => onScreen('route')}
+        >
+          {t('navRoute')}
         </button>
         <button
           className={screen === 'info' ? 'on' : ''}
