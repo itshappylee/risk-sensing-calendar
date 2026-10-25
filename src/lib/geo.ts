@@ -90,6 +90,12 @@ for (const p of COUNTRY_POINTS) {
   INDEX.set(p.code.toLowerCase(), p)
 }
 
+/** DB의 표기(Türkiye 등)를 앱 표준 국가명(Turkey 등)으로 통일한다 */
+export function canonicalCountry(country: string): string {
+  const k = country.trim().toLowerCase()
+  return ALIASES[k] ?? country
+}
+
 export function findPoint(country: string): GeoPoint | null {
   const k = country.trim().toLowerCase()
   return INDEX.get(k) ?? INDEX.get(ALIASES[k]?.toLowerCase() ?? '') ?? null

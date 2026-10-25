@@ -2,6 +2,7 @@ import type { RiskEvent } from './types'
 import { SAMPLE_EVENTS } from './sampleData'
 import { client, isConfigured } from './supabaseClient'
 import { log } from './log'
+import { canonicalCountry } from './geo'
 
 export { isConfigured }
 
@@ -49,7 +50,9 @@ export async function fetchEvents(from: string, to: string): Promise<LoadState> 
     })
     return { kind: 'empty', events: [] }
   }
-  return { kind: 'ok', events: data as RiskEvent[] }
+  // 표기 통일: DB의 'Türkiye'를 'Turkey'로 (필터·지도·경로 분석이 같은 이름을 쓰도록)
+  const events = (data as RiskEvent[]).map((e) => ({ ...e, country: canonicalCountry(e.country) }))
+  return { kind: 'ok', events }
 }
 
 /** 국가 필터용 목록. 현재 로드된 이벤트에서 뽑는다. */
