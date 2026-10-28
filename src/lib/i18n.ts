@@ -246,6 +246,18 @@ const dict = {
 
   // 2e Admin
   kpiPending: { ko: '승인 대기 사용자 보고', en: 'Reports awaiting approval' },
+  kpiOngoing: { ko: '진행 중(종료일 미정)', en: 'Ongoing (no end date)' },
+  ongoingTitle: { ko: '진행 중 — 종료일 미정', en: 'Ongoing — no end date' },
+  ongoingChip: { ko: '진행 중', en: 'Ongoing' },
+  ongoingPending: { ko: '승인 대기', en: 'Pending' },
+  ongoingEndToday: { ko: '오늘 종료', en: 'End today' },
+  ongoingEndPick: { ko: '종료일 지정', en: 'Pick end date' },
+  ongoingEndConfirm: { ko: '종료', en: 'End' },
+  ongoingEnded: { ko: '종료일을 확정했습니다 — 캘린더에도 반영됩니다', en: 'End date set — the calendar is updated too' },
+  ongoingNote: {
+    ko: '종료일이 없는 건은 매시간 오늘 날짜까지 자동으로 늘어납니다. 끝났다는 걸 알게 되면 바로 종료를 누르세요 — 이미 캘린더에 오른 건도 함께 고쳐집니다.',
+    en: 'Items without an end date are extended to today every hour. End them as soon as you learn they are over — calendar entries are corrected too.',
+  },
   kpiApprovedToday: { ko: '오늘 승인 처리', en: 'Approved today' },
   kpiNeedsReview: { ko: '검토 필요 정보', en: 'Items needing review' },
   tblUnverified: { ko: '미검증 사용자 보고', en: 'Unverified user reports' },

@@ -47,6 +47,12 @@ export interface Candidate {
   promoted: boolean
   collected_at: string
   decided_at: string | null
+  /**
+   * 종료일 미정(진행 중). DB 트리거가 정한다 — 시작일만 있고 종료일이 비면 true가 되고,
+   * 종료일은 매시간 오늘 날짜로 자동 연장된다(pg_cron `extend-open-ended`).
+   * 관리자가 '종료'를 누르면(`endOngoing`) false가 된다. (사용자 결정 2026-10-29)
+   */
+  open_ended?: boolean
 }
 
 export interface ReportInput {
@@ -130,6 +136,39 @@ export async function fetchDecidedToday(): Promise<Candidate[]> {
     return []
   }
   return (data ?? []) as Candidate[]
+}
+
+/**
+ * 진행 중(종료일 미정)인 건 — 승인 대기와 승인됨 모두. 수집·등록 당일부터 여기 뜬다.
+ * 관리자가 끝났다는 걸 알게 되는 순간 바로 '종료'를 누를 수 있게 하려는 목록이다 (2026-10-29).
+ */
+export async function fetchOngoing(): Promise<Candidate[]> {
+  if (!client) return []
+  const { data, error } = await client
+    .from('risk_candidates')
+    .select('*')
+    .eq('open_ended', true)
+    .in('admin_decision', ['pending', 'approved'])
+    .order('date_start', { ascending: true })
+  if (error) {
+    log('error', '진행 중 목록 조회 실패', { path: 'lib/candidates.fetchOngoing', supabaseError: error.message })
+    return []
+  }
+  return (data ?? []) as Candidate[]
+}
+
+/**
+ * 진행 중인 건을 끝낸다. 후보뿐 아니라 이미 캘린더에 오른 행(strikes_manual·raw_intake·events)의
+ * 종료일까지 DB 함수가 한 번에 바꾼다 — 승격된 행은 RLS가 막아 화면에서 직접 못 고치기 때문이다.
+ */
+export async function endOngoing(id: number, endDate: string): Promise<string | null> {
+  if (!client) return 'Supabase 연결이 설정되지 않았습니다'
+  const { error } = await client.rpc('end_open_ended', { p_id: id, p_end: endDate })
+  if (error) {
+    log('error', '진행 중 종료 실패', { path: 'lib/candidates.endOngoing', supabaseError: error.message })
+    return error.message
+  }
+  return null
 }
 
 /** 승인·반려를 취소하고 대기로 되돌린다. 이미 승격된 건의 events 행은 따로 제외해야 한다 */
