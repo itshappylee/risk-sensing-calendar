@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Lang } from '../lib/types'
 import { buildMonthWeeks, toISODate } from '../lib/calendar'
 import { fetchEvents, type LoadState } from '../lib/supabase'
-import { fetchCandidates, fetchDecidedToday, type Candidate } from '../lib/candidates'
+import { fetchCandidates, fetchDecidedToday, fetchOngoing, type Candidate } from '../lib/candidates'
 import { AdminScreen } from './AdminScreen'
 import { makeT } from '../lib/i18n'
 
@@ -31,6 +31,7 @@ export function AdminScreenContainer({
   const [state, setState] = useState<LoadState>({ kind: 'ok', events: [] })
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [decided, setDecided] = useState<Candidate[]>([])
+  const [ongoing, setOngoing] = useState<Candidate[]>([])
   const [loading, setLoading] = useState(true)
 
   const [from, to] = useMemo(() => {
@@ -40,9 +41,10 @@ export function AdminScreenContainer({
   }, [])
 
   const reload = useCallback(async () => {
-    const [cand, done, ev] = await Promise.all([
+    const [cand, done, open, ev] = await Promise.all([
       fetchCandidates(),
       fetchDecidedToday(),
+      fetchOngoing(),
       fetchEvents(from, to).catch(
         (err): LoadState => ({ kind: 'error', events: [], message: String(err) }),
       ),
@@ -50,6 +52,7 @@ export function AdminScreenContainer({
     if (cand.error) onToast(t('candidatesLoadFailed') + ' — ' + cand.error)
     setCandidates(cand.rows)
     setDecided(done)
+    setOngoing(open)
     setState(ev)
     setLoading(false)
   }, [onToast, t, from, to])
@@ -65,6 +68,7 @@ export function AdminScreenContainer({
       events={state.events}
       candidates={candidates}
       decided={decided}
+      ongoing={ongoing}
       signedIn={signedIn}
       onSignIn={onSignIn}
       onDecided={() => void reload()}

@@ -2,9 +2,11 @@ import { useState, type CSSProperties } from 'react'
 import type { Lang, RiskEvent } from '../lib/types'
 import { TYPE_META, severityBand, severityLabel } from '../lib/eventMeta'
 import { makeT, timeAgo, pickText } from '../lib/i18n'
+import { toISODate } from '../lib/calendar'
 import {
   CATEGORY_TO_TYPE,
   decideCandidate,
+  endOngoing,
   setEventStatus,
   undoDecision,
   type Candidate,
@@ -17,6 +19,8 @@ interface Props {
   candidates: Candidate[]
   /** 오늘 처리한 것들 — 눌렀는데 사라져서 뭘 했는지 볼 수 없던 문제 (2026-08-28) */
   decided: Candidate[]
+  /** 진행 중(종료일 미정) — 수집·등록 당일부터 뜬다. 끝나면 여기서 '종료'를 누른다 (2026-10-29) */
+  ongoing: Candidate[]
   signedIn: boolean
   onSignIn: () => void
   onDecided: () => void
@@ -35,12 +39,38 @@ interface Props {
  *
  * 아래쪽("수집 리스크 정보")의 수정·제외는 아직 연결돼 있지 않다.
  */
-export function AdminScreen({ lang, events, candidates, decided, signedIn, onSignIn, onDecided, onToast }: Props) {
+export function AdminScreen({
+  lang,
+  events,
+  candidates,
+  decided,
+  ongoing,
+  signedIn,
+  onSignIn,
+  onDecided,
+  onToast,
+}: Props) {
   const t = makeT(lang)
   const [busyId, setBusyId] = useState<number | null>(null)
   /** 반려 사유를 받는 중인 행. window.prompt를 쓰지 않는다 — 브라우저 모달은 화면을 통째로 막는다 */
   const [rejectingId, setRejectingId] = useState<number | null>(null)
   const [note, setNote] = useState('')
+
+  /** 진행 중 종료 — 종료일을 받는 중인 행과 그 값 */
+  const today = toISODate(new Date())
+  const [endingId, setEndingId] = useState<number | null>(null)
+  const [endDate, setEndDate] = useState(today)
+
+  async function finish(c: Candidate, date: string) {
+    if (!date) return onToast(t('dateStartRequired'))
+    if (c.date_start && date < c.date_start) return onToast(t('dateOrderWrong'))
+    setBusyId(c.id)
+    const err = await endOngoing(c.id, date)
+    setBusyId(null)
+    setEndingId(null)
+    onToast(err ?? t('ongoingEnded'))
+    if (!err) onDecided()
+  }
 
   async function toggleExclude(eventId: string, next: 'active' | 'excluded') {
     const err = await setEventStatus(eventId, next)
@@ -82,6 +112,11 @@ export function AdminScreen({ lang, events, candidates, decided, signedIn, onSig
       tone: candidates.length > 0 ? ('warn' as const) : ('muted' as const),
     },
     { label: t('kpiApprovedToday'), value: decided.length, tone: 'muted' as const },
+    {
+      label: t('kpiOngoing'),
+      value: ongoing.length,
+      tone: ongoing.length > 0 ? ('warn' as const) : ('muted' as const),
+    },
     {
       label: t('kpiNeedsReview'),
       value: needsReview.length,
@@ -133,7 +168,10 @@ export function AdminScreen({ lang, events, candidates, decided, signedIn, onSig
                   <b>{where}</b>
                   {c.raw_snippet ? ' — ' + c.raw_snippet : ''}
                 </span>
-                <span className="atbl-when">{when}</span>
+                <span className="atbl-when">
+                  {when}
+                  {c.open_ended && <em className="ongoing-chip">{t('ongoingChip')}</em>}
+                </span>
                 <span className="atbl-upd">
                   {c.source_type === 'manual' ? t('manualBadge') : t('aiBadge')}
                   {c.reported_by ? ' · ' + c.reported_by : ''}
@@ -207,6 +245,85 @@ export function AdminScreen({ lang, events, candidates, decided, signedIn, onSig
             </div>
           )}
         </section>
+
+        {/* ===== 진행 중(종료일 미정) — 수집·등록 당일부터 뜬다. 끝나면 '종료' =====
+            종료일은 DB가 매시간 오늘까지 늘린다. 승인 대기·승인됨을 함께 보여준다 —
+            대기 중이어도 끝난 걸 알면 바로 닫을 수 있어야 한다 (사용자 결정 2026-10-29). */}
+        {ongoing.length > 0 && (
+          <section className="panel admin-sec">
+            <h2 className="sec-title">
+              {t('ongoingTitle')} <span className="sec-n">{ongoing.length}</span>
+            </h2>
+            {ongoing.map((c) => {
+              const et = CATEGORY_TO_TYPE[c.category]
+              const meta = et ? TYPE_META[et] : null
+              const where = [c.country, c.region].filter(Boolean).join(' · ') || '—'
+              return (
+                <div className="rtbl-item" key={c.id}>
+                  <div className="rtbl-row">
+                    <span className="chip type">{meta ? meta.icon + ' ' + meta.label[lang] : c.category}</span>
+                    <span className="atbl-where">
+                      <b>{where}</b>
+                      {c.event_name ? ' — ' + c.event_name : ''}
+                    </span>
+                    <span className="atbl-when">
+                      {c.date_start} → {c.date_end ?? today}
+                      <em className="ongoing-chip">{t('ongoingChip')}</em>
+                    </span>
+                    <span className="atbl-upd">
+                      {c.admin_decision === 'approved' ? t('approve') : t('ongoingPending')}
+                    </span>
+                    <span className="atbl-act">
+                      {endingId === c.id ? (
+                        <>
+                          <input
+                            className="fld tiny-input"
+                            type="date"
+                            autoFocus
+                            min={c.date_start ?? undefined}
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                          />
+                          <button
+                            className="btn tiny primary"
+                            disabled={busyId === c.id || !endDate}
+                            onClick={() => finish(c, endDate)}
+                          >
+                            {t('ongoingEndConfirm')}
+                          </button>
+                          <button className="btn tiny" onClick={() => setEndingId(null)}>
+                            {t('cancel')}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            className="btn tiny primary"
+                            disabled={busyId === c.id}
+                            onClick={() => finish(c, today)}
+                          >
+                            {t('ongoingEndToday')}
+                          </button>
+                          <button
+                            className="btn tiny"
+                            disabled={busyId === c.id}
+                            onClick={() => {
+                              setEndDate(today)
+                              setEndingId(c.id)
+                            }}
+                          >
+                            {t('ongoingEndPick')}
+                          </button>
+                        </>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+            <p className="rtn-foot">{t('ongoingNote')}</p>
+          </section>
+        )}
 
         {/* ===== 오늘 처리한 것 — 되돌릴 수 있으려면 먼저 보여야 한다 ===== */}
         {decided.length > 0 && (
